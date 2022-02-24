@@ -51,14 +51,16 @@ type Job struct {
 	// being updated when the current Job run errored.
 	LastError pgtype.Text
 
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	FinishedAt time.Time
 
-	mu      sync.Mutex
-	deleted bool
-	pool    adapter.ConnPool
-	tx      adapter.Tx
-	backoff Backoff
+	mu       sync.Mutex
+	finished bool
+	deleted  bool
+	pool     adapter.ConnPool
+	tx       adapter.Tx
+	backoff  Backoff
 }
 
 // Tx returns DB transaction that this job is locked to. You may use
@@ -91,6 +93,49 @@ func (j *Job) Delete(ctx context.Context) error {
 	}
 
 	j.deleted = true
+	return nil
+}
+
+// Finished marks this job as finished by inserting finished_at field in table gue_jobs
+//
+// You must also later call Done() to return this job's database connection to
+// the pool.
+func (j *Job) Finished(ctx context.Context) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if j.finished {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	_, err := j.tx.Exec(ctx, ` UPDATE gue_jobs SET finished_at =$1 WHERE job_id = $2`, now, j.ID)
+	if err != nil {
+		return err
+	}
+
+	j.FinishedAt = now
+	j.finished = true
+	return nil
+}
+
+// Migrate completed jobs to the gue_jobs_finished table after being performed.
+func (j *Job) Migrate(ctx context.Context) error {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+
+	if !j.finished {
+		return nil
+	}
+
+	_, err := j.tx.Exec(ctx, "INSERT INTO gue_jobs_finished (job_id, job_type, queue, args, priority, run_at, "+
+		"error_count, last_error, created_at, updated_at, finished_at) "+
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", j.ID, j.Type, j.Queue, j.Args, j.Priority, j.RunAt,
+		j.ErrorCount, j.LastError, j.CreatedAt, j.UpdatedAt, j.finished)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

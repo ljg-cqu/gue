@@ -32,6 +32,10 @@ const (
 // table for analytics or debugging purposes, you can pass the PreserveCompletedJobs option to gue.NewWorkerPool.
 var PreserveCompletedJobs = false
 
+// By default, jobs are migrate to the gue_jobs_finished table after being performed.
+// You can pass the MigratedCompletedJobs option to gue.NewWorkerPool to have your own control.
+var MigrateCompletedJobs = true
+
 // WorkFunc is a function that performs a Job. If an error is returned, the job
 // is re-enqueued with exponential backoff.
 type WorkFunc func(ctx context.Context, j *Job) error
@@ -66,6 +70,7 @@ type Worker struct {
 	pollStrategy          PollStrategy
 	pollFunc              pollFunc
 	preserveCompletedJobs bool
+	migrateCompletedJob   bool
 
 	hooksJobLocked      []HookFunc
 	hooksUnknownJobType []HookFunc
@@ -89,6 +94,7 @@ func NewWorker(c *Client, wm WorkMap, options ...WorkerOption) *Worker {
 		logger:                adapter.NoOpLogger{},
 		pollStrategy:          PriorityPollStrategy,
 		preserveCompletedJobs: PreserveCompletedJobs,
+		migrateCompletedJob:   MigrateCompletedJobs,
 	}
 
 	for _, option := range options {
@@ -249,9 +255,20 @@ func (w *Worker) WorkOne(ctx context.Context) (didWork bool) {
 		hook(ctx, j, nil)
 	}
 
+	// Mark a job as finished after being performed successfully, no matter hooksJobDone fail or succeed.
+	if err := j.Finished(ctx); err != nil {
+		ll.Error("Got an error on setting an mark job as finished", adapter.Err(err))
+	}
+
 	if !w.preserveCompletedJobs {
 		if err = j.Delete(ctx); err != nil {
 			ll.Error("Got an error on deleting a job", adapter.Err(err))
+		}
+	}
+
+	if w.migrateCompletedJob {
+		if err := j.Migrate(ctx); err != nil {
+			ll.Error("Got an error on migrating a job", adapter.Err(err))
 		}
 	}
 
@@ -294,6 +311,7 @@ type WorkerPool struct {
 	running               bool
 	pollStrategy          PollStrategy
 	preserveCompletedJobs bool
+	migrateCompletedJob   bool
 
 	hooksJobLocked      []HookFunc
 	hooksUnknownJobType []HookFunc
@@ -340,6 +358,7 @@ func NewWorkerPool(c *Client, wm WorkMap, poolSize int, options ...WorkerPoolOpt
 			WithWorkerHooksUnknownJobType(w.hooksUnknownJobType...),
 			WithWorkerHooksJobDone(w.hooksJobDone...),
 			WithWorkerPreserveCompletedJobs(w.preserveCompletedJobs),
+			WithWorkerMigrateCompletedJobs(w.migrateCompletedJob),
 		)
 	}
 

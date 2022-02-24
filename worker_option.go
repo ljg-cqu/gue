@@ -48,6 +48,12 @@ func WithWorkerPreserveCompletedJobs(preserve bool) WorkerOption {
 	}
 }
 
+func WithWorkerMigrateCompletedJobs(migrate bool) WorkerOption {
+	return func(w *Worker) {
+		w.migrateCompletedJob = migrate
+	}
+}
+
 // WithWorkerHooksJobLocked sets hooks that are called right after the job was polled from the DB.
 // Depending on the polling results hook will have either error or job set, but not both.
 // If the error field is set - no other lifecycle hooks will be called for the job.
@@ -114,6 +120,12 @@ func WithPoolLogger(logger adapter.Logger) WorkerPoolOption {
 func WithPoolPreserveCompletedJobs(preserve bool) WorkerPoolOption {
 	return func(pool *WorkerPool) {
 		pool.preserveCompletedJobs = preserve
+	}
+}
+
+func WithPoolMigrateCompletedJobs(migrate bool) WorkerPoolOption {
+	return func(pool *WorkerPool) {
+		pool.migrateCompletedJob = migrate
 	}
 }
 
