@@ -69,6 +69,9 @@ func (c *Client) execEnqueue(ctx context.Context, j *Job, q adapter.Queryable) e
 
 	now := time.Now().UTC()
 
+	j.CreatedAt = now
+	j.UpdatedAt = now
+
 	runAt := j.RunAt
 	if runAt.IsZero() {
 		j.RunAt = now
@@ -117,7 +120,7 @@ func (c *Client) LockJob(ctx context.Context, queue string) (*Job, error) {
 
 	j := Job{pool: c.pool, tx: tx, backoff: c.backoff}
 
-	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count
+	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count, created_at, updated_at
 FROM gue_jobs
 WHERE queue = $1 AND run_at <= $2
 ORDER BY priority ASC
@@ -129,6 +132,8 @@ LIMIT 1 FOR UPDATE SKIP LOCKED`, queue, now).Scan(
 		&j.Type,
 		(*json.RawMessage)(&j.Args),
 		&j.ErrorCount,
+		&j.CreatedAt,
+		&j.UpdatedAt,
 	)
 	if err == nil {
 		return &j, nil
@@ -160,7 +165,7 @@ func (c *Client) LockJobByID(ctx context.Context, id int64) (*Job, error) {
 
 	j := Job{pool: c.pool, tx: tx, backoff: c.backoff}
 
-	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count
+	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count, created_at, updated_at
 FROM gue_jobs
 WHERE job_id = $1 FOR UPDATE SKIP LOCKED`, id).Scan(
 		&j.ID,
@@ -170,6 +175,8 @@ WHERE job_id = $1 FOR UPDATE SKIP LOCKED`, id).Scan(
 		&j.Type,
 		(*json.RawMessage)(&j.Args),
 		&j.ErrorCount,
+		&j.CreatedAt,
+		&j.UpdatedAt,
 	)
 	if err == nil {
 		return &j, nil
@@ -203,7 +210,7 @@ func (c *Client) LockNextScheduledJob(ctx context.Context, queue string) (*Job, 
 
 	j := Job{pool: c.pool, tx: tx, backoff: c.backoff}
 
-	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count
+	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count, created_at, updated_at
 FROM gue_jobs
 WHERE queue = $1 AND run_at <= $2
 ORDER BY run_at, priority ASC
@@ -215,6 +222,8 @@ LIMIT 1 FOR UPDATE SKIP LOCKED`, queue, now).Scan(
 		&j.Type,
 		(*json.RawMessage)(&j.Args),
 		&j.ErrorCount,
+		&j.CreatedAt,
+		&j.UpdatedAt,
 	)
 	if err == nil {
 		return &j, nil

@@ -51,6 +51,9 @@ type Job struct {
 	// being updated when the current Job run errored.
 	LastError pgtype.Text
 
+	CreatedAt time.Time
+	UpdatedAt time.Time
+
 	mu      sync.Mutex
 	deleted bool
 	pool    adapter.ConnPool

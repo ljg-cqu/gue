@@ -664,7 +664,7 @@ func findOneJob(t testing.TB, q adapter.Queryable) *Job {
 	j := new(Job)
 	err := q.QueryRow(
 		context.Background(),
-		`SELECT priority, run_at, job_id, job_type, args, error_count, last_error, queue FROM gue_jobs LIMIT 1`,
+		`SELECT priority, run_at, job_id, job_type, args, error_count, last_error, queue, created_at, updated_at FROM gue_jobs LIMIT 1`,
 	).Scan(
 		&j.Priority,
 		&j.RunAt,
@@ -674,6 +674,8 @@ func findOneJob(t testing.TB, q adapter.Queryable) *Job {
 		&j.ErrorCount,
 		&j.LastError,
 		&j.Queue,
+		&j.CreatedAt,
+		&j.UpdatedAt,
 	)
 	if err == adapter.ErrNoRows {
 		return nil
