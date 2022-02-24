@@ -28,6 +28,10 @@ const (
 	RunAtPollStrategy PollStrategy = "OrderByRunAtPriority"
 )
 
+// By default, jobs are deleted from the gue_jobs table after being performed. If you would prefer to leave them in the
+// table for analytics or debugging purposes, you can pass the PreserveCompletedJobs option to gue.NewWorkerPool.
+var PreserveCompletedJobs = false
+
 // WorkFunc is a function that performs a Job. If an error is returned, the job
 // is re-enqueued with exponential backoff.
 type WorkFunc func(ctx context.Context, j *Job) error
@@ -51,16 +55,17 @@ type pollFunc func(context.Context, string) (*Job, error)
 // Worker is a single worker that pulls jobs off the specified queue. If no Job
 // is found, the Worker will sleep for interval seconds.
 type Worker struct {
-	wm           WorkMap
-	interval     time.Duration
-	queue        string
-	c            *Client
-	id           string
-	logger       adapter.Logger
-	mu           sync.Mutex
-	running      bool
-	pollStrategy PollStrategy
-	pollFunc     pollFunc
+	wm                    WorkMap
+	interval              time.Duration
+	queue                 string
+	c                     *Client
+	id                    string
+	logger                adapter.Logger
+	mu                    sync.Mutex
+	running               bool
+	pollStrategy          PollStrategy
+	pollFunc              pollFunc
+	preserveCompletedJobs bool
 
 	hooksJobLocked      []HookFunc
 	hooksUnknownJobType []HookFunc
@@ -77,12 +82,13 @@ type Worker struct {
 // WithWorkerQueue option.
 func NewWorker(c *Client, wm WorkMap, options ...WorkerOption) *Worker {
 	w := Worker{
-		interval:     defaultPollInterval,
-		queue:        defaultQueueName,
-		c:            c,
-		wm:           wm,
-		logger:       adapter.NoOpLogger{},
-		pollStrategy: PriorityPollStrategy,
+		interval:              defaultPollInterval,
+		queue:                 defaultQueueName,
+		c:                     c,
+		wm:                    wm,
+		logger:                adapter.NoOpLogger{},
+		pollStrategy:          PriorityPollStrategy,
+		preserveCompletedJobs: PreserveCompletedJobs,
 	}
 
 	for _, option := range options {
@@ -243,8 +249,10 @@ func (w *Worker) WorkOne(ctx context.Context) (didWork bool) {
 		hook(ctx, j, nil)
 	}
 
-	if err = j.Delete(ctx); err != nil {
-		ll.Error("Got an error on deleting a job", adapter.Err(err))
+	if !w.preserveCompletedJobs {
+		if err = j.Delete(ctx); err != nil {
+			ll.Error("Got an error on deleting a job", adapter.Err(err))
+		}
 	}
 
 	ll.Debug("Job finished")
@@ -275,16 +283,17 @@ func recoverPanic(ctx context.Context, logger adapter.Logger, j *Job) {
 // WorkerPool is a pool of Workers, each working jobs from the queue
 // at the specified interval using the WorkMap.
 type WorkerPool struct {
-	wm           WorkMap
-	interval     time.Duration
-	queue        string
-	c            *Client
-	workers      []*Worker
-	id           string
-	logger       adapter.Logger
-	mu           sync.Mutex
-	running      bool
-	pollStrategy PollStrategy
+	wm                    WorkMap
+	interval              time.Duration
+	queue                 string
+	c                     *Client
+	workers               []*Worker
+	id                    string
+	logger                adapter.Logger
+	mu                    sync.Mutex
+	running               bool
+	pollStrategy          PollStrategy
+	preserveCompletedJobs bool
 
 	hooksJobLocked      []HookFunc
 	hooksUnknownJobType []HookFunc
@@ -298,13 +307,14 @@ type WorkerPool struct {
 // nameless queue "", which can be overridden by WithPoolQueue option.
 func NewWorkerPool(c *Client, wm WorkMap, poolSize int, options ...WorkerPoolOption) *WorkerPool {
 	w := WorkerPool{
-		wm:           wm,
-		interval:     defaultPollInterval,
-		queue:        defaultQueueName,
-		c:            c,
-		workers:      make([]*Worker, poolSize),
-		logger:       adapter.NoOpLogger{},
-		pollStrategy: PriorityPollStrategy,
+		wm:                    wm,
+		interval:              defaultPollInterval,
+		queue:                 defaultQueueName,
+		c:                     c,
+		workers:               make([]*Worker, poolSize),
+		logger:                adapter.NoOpLogger{},
+		pollStrategy:          PriorityPollStrategy,
+		preserveCompletedJobs: PreserveCompletedJobs,
 	}
 
 	for _, option := range options {
@@ -329,6 +339,7 @@ func NewWorkerPool(c *Client, wm WorkMap, poolSize int, options ...WorkerPoolOpt
 			WithWorkerHooksJobLocked(w.hooksJobLocked...),
 			WithWorkerHooksUnknownJobType(w.hooksUnknownJobType...),
 			WithWorkerHooksJobDone(w.hooksJobDone...),
+			WithWorkerPreserveCompletedJobs(w.preserveCompletedJobs),
 		)
 	}
 

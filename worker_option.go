@@ -41,6 +41,13 @@ func WithWorkerLogger(logger adapter.Logger) WorkerOption {
 	}
 }
 
+// WithWorkerPreserveCompletedJobs determines whether jobs are deleted from the gue_jobs table after being performed.
+func WithWorkerPreserveCompletedJobs(preserve bool) WorkerOption {
+	return func(w *Worker) {
+		w.preserveCompletedJobs = preserve
+	}
+}
+
 // WithWorkerHooksJobLocked sets hooks that are called right after the job was polled from the DB.
 // Depending on the polling results hook will have either error or job set, but not both.
 // If the error field is set - no other lifecycle hooks will be called for the job.
@@ -100,6 +107,13 @@ func WithPoolID(id string) WorkerPoolOption {
 func WithPoolLogger(logger adapter.Logger) WorkerPoolOption {
 	return func(w *WorkerPool) {
 		w.logger = logger
+	}
+}
+
+// WithPoolPreserveCompletedJobs determines whether jobs are deleted from the gue_jobs table after being performed.
+func WithPoolPreserveCompletedJobs(preserve bool) WorkerPoolOption {
+	return func(pool *WorkerPool) {
+		pool.preserveCompletedJobs = preserve
 	}
 }
 
