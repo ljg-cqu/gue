@@ -70,7 +70,7 @@ func (c *Client) execEnqueue(ctx context.Context, j *Job, q adapter.Queryable) e
 	now := time.Now().UTC()
 
 	j.CreatedAt = now
-	j.UpdatedAt = now
+	//j.UpdatedAt // limit update only when error occurs
 
 	runAt := j.RunAt
 	if runAt.IsZero() {
@@ -82,16 +82,18 @@ func (c *Client) execEnqueue(ctx context.Context, j *Job, q adapter.Queryable) e
 	}
 
 	err := q.QueryRow(ctx, `INSERT INTO gue_jobs
-(queue, priority, run_at, job_type, args, created_at, updated_at)
+(queue, priority, run_at, job_type, args, created_at)
 VALUES
-($1, $2, $3, $4, $5, $6, $6) RETURNING job_id
+($1, $2, $3, $4, $5, $6) RETURNING job_id
 `, j.Queue, j.Priority, j.RunAt, j.Type, json.RawMessage(j.Args), now).Scan(&j.ID)
 
 	c.logger.Debug(
 		"Tried to enqueue a job",
 		adapter.Err(err),
 		adapter.F("queue", j.Queue),
-		adapter.F("id", j.ID),
+		adapter.F("job_id", j.ID),
+		adapter.F("job_type", j.Type),
+		adapter.F("args", string(j.Args)),
 	)
 
 	return err
