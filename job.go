@@ -132,15 +132,20 @@ func (j *Job) Migrate(ctx context.Context) error {
 		return nil
 	}
 
-	_, err := j.tx.Exec(ctx, "INSERT INTO gue_jobs_finished (job_id, job_type, queue, args, priority, run_at, "+
-		"error_count, last_error, created_at, updated_at, finished_at) "+
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", j.ID, j.Type, j.Queue, j.Args, j.Priority, j.RunAt,
-		j.ErrorCount, j.LastError, j.CreatedAt, j.UpdatedAt.Time.UTC(), j.FinishedAt.Time.UTC())
-	if err != nil {
+	if j.UpdatedAt.Valid {
+		_, err := j.tx.Exec(ctx, "INSERT INTO gue_jobs_finished (job_id, job_type, queue, args, priority, run_at, "+
+			"error_count, last_error, created_at, updated_at, finished_at) "+
+			"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", j.ID, j.Type, j.Queue, j.Args, j.Priority, j.RunAt,
+			j.ErrorCount, j.LastError, j.CreatedAt, j.UpdatedAt.Time.UTC(), j.FinishedAt.Time.UTC())
 		return err
 	}
 
-	return nil
+	_, err := j.tx.Exec(ctx, "INSERT INTO gue_jobs_finished (job_id, job_type, queue, args, priority, run_at, "+
+		"error_count, last_error, created_at, finished_at) "+
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", j.ID, j.Type, j.Queue, j.Args, j.Priority, j.RunAt,
+		j.ErrorCount, j.LastError, j.CreatedAt, j.FinishedAt.Time.UTC())
+
+	return err
 }
 
 // Done commits transaction that marks job as done. If you got the job from the worker - it will take care of
