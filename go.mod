@@ -1,4 +1,4 @@
-module github.com/ljg-cqu/gue/v3
+module github.com/vgarvardt/gue/v3
 
 go 1.16
 
