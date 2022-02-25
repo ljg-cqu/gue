@@ -2,6 +2,7 @@ package gue
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"sync"
 	"time"
@@ -52,8 +53,8 @@ type Job struct {
 	LastError pgtype.Text
 
 	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	FinishedAt time.Time
+	UpdatedAt  sql.NullTime
+	FinishedAt sql.NullTime
 
 	mu       sync.Mutex
 	finished bool
