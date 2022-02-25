@@ -115,7 +115,10 @@ func (j *Job) Finished(ctx context.Context) error {
 		return err
 	}
 
-	j.FinishedAt = now
+	j.FinishedAt = sql.NullTime{
+		Time:  now,
+		Valid: true,
+	}
 	j.finished = true
 	return nil
 }
