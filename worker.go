@@ -333,6 +333,7 @@ func NewWorkerPool(c *Client, wm WorkMap, poolSize int, options ...WorkerPoolOpt
 		logger:                adapter.NoOpLogger{},
 		pollStrategy:          PriorityPollStrategy,
 		preserveCompletedJobs: PreserveCompletedJobs,
+		migrateCompletedJob:   MigrateCompletedJobs,
 	}
 
 	for _, option := range options {
