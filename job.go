@@ -135,7 +135,7 @@ func (j *Job) Migrate(ctx context.Context) error {
 	_, err := j.tx.Exec(ctx, "INSERT INTO gue_jobs_finished (job_id, job_type, queue, args, priority, run_at, "+
 		"error_count, last_error, created_at, updated_at, finished_at) "+
 		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)", j.ID, j.Type, j.Queue, j.Args, j.Priority, j.RunAt,
-		j.ErrorCount, j.LastError, j.CreatedAt, j.UpdatedAt, j.finished)
+		j.ErrorCount, j.LastError, j.CreatedAt, j.UpdatedAt.Time.UTC(), j.FinishedAt.Time.UTC())
 	if err != nil {
 		return err
 	}
