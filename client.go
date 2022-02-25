@@ -124,7 +124,7 @@ func (c *Client) LockJob(ctx context.Context, queue string) (*Job, error) {
 
 	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count, last_error, created_at, updated_at
 FROM gue_jobs
-WHERE queue = $1 AND run_at <= $2 AND finished_at = null
+WHERE queue = $1 AND run_at <= $2 AND finished_at IS NULL
 ORDER BY priority ASC
 LIMIT 1 FOR UPDATE SKIP LOCKED`, queue, now).Scan(
 		&j.ID,
@@ -216,7 +216,7 @@ func (c *Client) LockNextScheduledJob(ctx context.Context, queue string) (*Job, 
 
 	err = tx.QueryRow(ctx, `SELECT job_id, queue, priority, run_at, job_type, args, error_count, last_error, created_at, updated_at
 FROM gue_jobs
-WHERE queue = $1 AND run_at <= $2 AND finished_at = null
+WHERE queue = $1 AND run_at <= $2 AND finished_at IS NULL
 ORDER BY run_at, priority ASC
 LIMIT 1 FOR UPDATE SKIP LOCKED`, queue, now).Scan(
 		&j.ID,
